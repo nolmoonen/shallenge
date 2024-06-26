@@ -1,0 +1,25 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "relwithdebinfo",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/relwithdebinfo",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_CUDA_FLAGS": "-Wall -Wextra --generate-line-info",
+                "CMAKE_PREFIX_PATH": "/usr/local/cuda"
+            }
+        },
+        {
+            "name": "debug",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CUDA_FLAGS": "-Wall -Wextra --generate-line-info",
+                "CMAKE_PREFIX_PATH": "/usr/local/cuda"
+            }
+        }
+    ]
+}
