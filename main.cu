@@ -14,6 +14,9 @@ constexpr uint32_t k[64] = {
 
 constexpr int block_size_u32 = 512 / 32;
 constexpr int hash_size_u32  = 256 / 32;
+constexpr int block_size_u8  = 512 / 8;
+constexpr int num_inputs_u8  = block_size_u8 - 8 - 4; // len in u64 and bit padding in u32
+constexpr int num_inputs_u32 = num_inputs_u8 / 4;
 
 uint32_t rotr(uint32_t a, int b) { return (a >> b) | (a << (32 - b)); }
 uint32_t ch(uint32_t x, uint32_t y, uint32_t z) { return (x & y) ^ (~x & z); }
@@ -34,7 +37,7 @@ void sha256(uint32_t (&hash)[hash_size_u32], const uint32_t (&block)[block_size_
 {
     uint32_t m[64];
     for (int i = 0; i < block_size_u32; ++i) {
-        m[i] = swap_endian(block[i]);
+        m[i] = block[i];
     }
     for (int i = 16; i < 64; ++i) {
         m[i] = sig1(m[i - 2]) + m[i - 7] + sig0(m[i - 15]) + m[i - 16];
@@ -87,31 +90,53 @@ void do_hash(const uint32_t (&block)[block_size_u32], uint32_t (&hash)[hash_size
     sha256(hash, block);
 }
 
-int main()
+void print_input(const uint32_t (&block)[block_size_u32])
 {
-    const char* message_string = "test/0";
-    const int message_len      = std::strlen(message_string);
-    if (message_len + 1 + 8 > 512 / 8) {
-        std::cout << "message too long\n";
-        return EXIT_FAILURE;
-    }
-
-    uint32_t block[block_size_u32] = {}; // zero-initialize
-    for (int i = 0; i < message_len; ++i) {
-        reinterpret_cast<uint8_t*>(block)[i] = message_string[i];
-    }
-    reinterpret_cast<uint8_t*>(block)[message_len] = 0x80; // append single 1 bit
-    // final 64-bits is length of original message
-    uint32_t lenu32     = 8 * message_len;
-    auto tmp            = reinterpret_cast<const uint8_t*>(&lenu32);
-    block[512 / 32 - 1] = tmp[3] | (tmp[2] << 8) | (tmp[1] << 16) | (tmp[0] << 24);
-
-    uint32_t hash[hash_size_u32];
-    sha256(hash, block);
-
-    // 582fa6476ded1ee8e6f6f1339d98e5a1b609666b5ab07521bfb3a25b1502ff63
-    for (int i = 0; i < 256 / 8; ++i) {
-        printf("%x", reinterpret_cast<const uint8_t*>(hash)[i]);
+    for (int i = 0; i < num_inputs_u32; ++i) {
+        const uint32_t tmp = swap_endian(block[i]);
+        for (int j = 0; j < 4; ++j) {
+            printf("%c", reinterpret_cast<const char*>(&tmp)[j]);
+        }
     }
     printf("\n");
+}
+
+void print_hash(uint32_t (&hash)[hash_size_u32])
+{
+    for (int i = 0; i < 256 / 8; ++i) {
+        printf("%02x", reinterpret_cast<const uint8_t*>(hash)[i]);
+    }
+    printf(": %u\n", swap_endian(hash[0])); // score, lower is better
+}
+
+uint8_t base64_to_ascii(int x)
+{
+    return x < 26 ? 65 + x : x < 52 ? 71 + x : x < 62 ? x - 4 : x < 63 ? 43 : 47;
+}
+
+int main()
+{
+    uint32_t block[block_size_u32];
+    block[0] = uint32_t{'n'} << 24 | (uint32_t{'o'} << 16) | (uint32_t{'l'} << 8) | (uint32_t{'/'});
+    for (int i = 0; i < num_inputs_u32; ++i) {
+        block[1 + i] =
+            uint32_t{'0'} | (uint32_t{'0'} << 8) | (uint32_t{'0'} << 16) | (uint32_t{'0'} << 24);
+    }
+    block[block_size_u32 - 3] = swap_endian(uint32_t{0x80}); // single bit padding
+    block[block_size_u32 - 2] = 0;
+    // length, 64 - 8 - 4 = 52 * 8 = 416 in u32 big endian
+    block[block_size_u32 - 1] = uint32_t{416};
+
+    for (int i = 0; i < 64; ++i) {
+        const uint8_t val         = base64_to_ascii(i);
+        const uint32_t cur        = block[num_inputs_u32 - 1] & 0xffffff00;
+        block[num_inputs_u32 - 1] = cur | val;
+
+        print_input(block);
+
+        uint32_t hash[hash_size_u32];
+        sha256(hash, block);
+
+        print_hash(hash);
+    }
 }
