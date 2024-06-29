@@ -9,6 +9,13 @@
 #include <vector>
 
 #ifdef __CUDA_ARCH__
+#define DEVICE_UNROLL #pragma unroll
+#else
+#define DEVICE_UNROLL
+#endif
+
+// no need to optimize loading, these constants are inlined
+#ifdef __CUDA_ARCH__
 __device__
 #endif
     constexpr uint32_t k[64] = {
@@ -39,7 +46,12 @@ struct hash_t {
 
 __forceinline__ __device__ __host__ uint32_t rotr(uint32_t a, int b)
 {
+#if __CUDA_ARCH__ and 0
+    // seems to be worse, looks like the compiler can already figure this out
+    return __funnelshift_r(a, a, b);
+#else
     return (a >> b) | (a << (32 - b));
+#endif
 }
 __forceinline__ __device__ __host__ uint32_t ch(uint32_t x, uint32_t y, uint32_t z)
 {
@@ -79,57 +91,61 @@ __forceinline__ __device__ __host__ uint32_t swap_endian(uint32_t x)
 
 __forceinline__ __device__ __host__ void sha256(hash_t& hash, const block_t& block)
 {
-    uint32_t m[64];
-    for (int i = 0; i < block_size_u32; ++i) {
-        m[i] = block.arr[i];
+    uint32_t m[16];
+    std::memcpy(m, block.arr, sizeof(block.arr));
+
+    constexpr uint32_t aa = 0x6a09e667;
+    constexpr uint32_t bb = 0xbb67ae85;
+    constexpr uint32_t cc = 0x3c6ef372;
+    constexpr uint32_t dd = 0xa54ff53a;
+    constexpr uint32_t ee = 0x510e527f;
+    constexpr uint32_t ff = 0x9b05688c;
+    constexpr uint32_t gg = 0x1f83d9ab;
+    constexpr uint32_t hh = 0x5be0cd19;
+
+    uint32_t a = aa;
+    uint32_t b = bb;
+    uint32_t c = cc;
+    uint32_t d = dd;
+    uint32_t e = ee;
+    uint32_t f = ff;
+    uint32_t g = gg;
+    uint32_t h = hh;
+
+    DEVICE_UNROLL
+    for (int j = 0; j < 4; j++) {
+        DEVICE_UNROLL
+        for (int i = 0; i < 16; ++i) {
+            const uint32_t t1 = h + ep1(e) + ch(e, f, g) + k[16 * j + i] + m[i];
+            const uint32_t t2 = ep0(a) + maj(a, b, c);
+
+            h = g;
+            g = f;
+            f = e;
+            e = d + t1;
+            d = c;
+            c = b;
+            b = a;
+            a = t1 + t2;
+        }
+
+        if (j < 3) {
+            DEVICE_UNROLL
+            for (int i = 0; i < 16; ++i) {
+                m[i] = sig1(m[(i + 16 - 2) % 16]) + m[(i + 16 - 7) % 16] +
+                       sig0(m[(i + 16 - 15) % 16]) + m[(i + 16 - 16) % 16];
+            }
+        }
     }
-    for (int i = 16; i < 64; ++i) {
-        m[i] = sig1(m[i - 2]) + m[i - 7] + sig0(m[i - 15]) + m[i - 16];
-    }
 
-    hash.arr[0] = 0x6a09e667;
-    hash.arr[1] = 0xbb67ae85;
-    hash.arr[2] = 0x3c6ef372;
-    hash.arr[3] = 0xa54ff53a;
-    hash.arr[4] = 0x510e527f;
-    hash.arr[5] = 0x9b05688c;
-    hash.arr[6] = 0x1f83d9ab;
-    hash.arr[7] = 0x5be0cd19;
-
-    uint32_t a = hash.arr[0];
-    uint32_t b = hash.arr[1];
-    uint32_t c = hash.arr[2];
-    uint32_t d = hash.arr[3];
-    uint32_t e = hash.arr[4];
-    uint32_t f = hash.arr[5];
-    uint32_t g = hash.arr[6];
-    uint32_t h = hash.arr[7];
-
-#ifdef __CUDA_ARCH__
-#pragma unroll
-#endif
-    for (int i = 0; i < 64; ++i) {
-        const uint32_t t1 = h + ep1(e) + ch(e, f, g) + k[i] + m[i];
-        const uint32_t t2 = ep0(a) + maj(a, b, c);
-
-        h = g;
-        g = f;
-        f = e;
-        e = d + t1;
-        d = c;
-        c = b;
-        b = a;
-        a = t1 + t2;
-    }
-
-    hash.arr[0] = swap_endian(hash.arr[0] + a);
-    hash.arr[1] = swap_endian(hash.arr[1] + b);
-    hash.arr[2] = swap_endian(hash.arr[2] + c);
-    hash.arr[3] = swap_endian(hash.arr[3] + d);
-    hash.arr[4] = swap_endian(hash.arr[4] + e);
-    hash.arr[5] = swap_endian(hash.arr[5] + f);
-    hash.arr[6] = swap_endian(hash.arr[6] + g);
-    hash.arr[7] = swap_endian(hash.arr[7] + h);
+    hash.arr[0] = swap_endian(aa + a);
+    hash.arr[1] = swap_endian(bb + b);
+    hash.arr[2] = swap_endian(cc + c);
+    hash.arr[3] = swap_endian(dd + d);
+    hash.arr[4] = swap_endian(ee + e);
+    hash.arr[5] = swap_endian(ff + f);
+    hash.arr[6] = swap_endian(gg + g);
+    hash.arr[7] = swap_endian(hh + h);
 }
 
 __forceinline__ __device__ __host__ bool less_than(const hash_t& lhs, const hash_t& rhs)
@@ -151,10 +167,12 @@ __forceinline__ __device__ uint8_t base64_to_ascii(int x)
     return x < 26 ? 65 + x : x < 52 ? 71 + x : x < 62 ? x - 4 : x < 63 ? 43 : 47;
 }
 
+constexpr int max_thread_count = 64 * 64 * 64 * 64;
+
 /// \brief Encode a value in range [0, 64^4) to a u32 encoded as base64.
 __forceinline__ __device__ uint32_t encode(int val)
 {
-    assert(0 <= val && val < 64 * 64 * 64 * 64);
+    assert(0 <= val && val < max_thread_count);
     uint32_t ret{};
     for (int i = 0; i < 4; ++i) {
         ret |= base64_to_ascii(val % 64) << i * 8;
@@ -163,7 +181,15 @@ __forceinline__ __device__ uint32_t encode(int val)
     return ret;
 }
 
-constexpr int max_thread_count = 64 * 64 * 64 * 64;
+__forceinline__ __device__ __host__ void copy(block_t& dst, const block_t& src)
+{
+    std::memcpy(dst.arr, src.arr, sizeof(dst.arr));
+}
+
+__forceinline__ __device__ __host__ void copy(hash_t& dst, const hash_t& src)
+{
+    std::memcpy(dst.arr, src.arr, sizeof(dst.arr));
+}
 
 template <int block_size>
 __global__ void hash(int iteration, block_t* blocks)
@@ -194,9 +220,7 @@ __global__ void hash(int iteration, block_t* blocks)
 
     // set the last u32 to the items handled by this thread
     constexpr int ascii_lowercase_a = 97;
-    // for (int i = 0; i < 64; ++i)
-    {
-        const int i           = 0;
+    for (int i = 0; i < 26; ++i) {
         const uint32_t mask_i = (ascii_lowercase_a + i) << 24;
         for (int j = 0; j < 26; ++j) {
             const uint32_t mask_j = (ascii_lowercase_a + j) << 16;
@@ -210,8 +234,8 @@ __global__ void hash(int iteration, block_t* blocks)
                     sha256(hash, block);
 
                     if (less_than(hash, best_hash)) {
-                        std::memcpy(&best_hash, &hash, sizeof(hash));
-                        std::memcpy(&best_block, &block, sizeof(block));
+                        copy(best_hash, hash);
+                        copy(best_block, block);
                     }
                 }
             }
@@ -240,7 +264,7 @@ __global__ void hash(int iteration, block_t* blocks)
     }
     __syncthreads();
     if (threadIdx.x == best_i) {
-        std::memcpy(&(blocks[blockIdx.x]), &best_block, sizeof(block_t));
+        copy(blocks[blockIdx.x], best_block);
     }
 }
 
@@ -248,7 +272,7 @@ __global__ void hash(int iteration, block_t* blocks)
     do {                                                                                           \
         cudaError_t err = call;                                                                    \
         if (err != cudaSuccess) {                                                                  \
-            printf("CUDA error at " __FILE__ ":%d \"%s\"", __LINE__, cudaGetErrorString(err));     \
+            printf("CUDA error at " __FILE__ ":%d \"%s\"\n", __LINE__, cudaGetErrorString(err));   \
             std::exit(EXIT_FAILURE);                                                               \
         }                                                                                          \
     } while (0)
@@ -282,7 +306,7 @@ int main()
     CHECK_CUDA(cudaEventCreate(&stop));
 
     constexpr int grid_size  = 256;
-    constexpr int block_size = 512;
+    constexpr int block_size = 256;
     static_assert(grid_size * block_size <= max_thread_count);
 
     block_t* d_blocks{};
@@ -292,19 +316,20 @@ int main()
     hash_t best_hash;
     std::memset(&best_hash, 0xff, sizeof(hash_t));
 
-    const int num_iterations = 256;
+    const int num_iterations = 1;
     for (int i = 0; i < num_iterations; ++i) {
         CHECK_CUDA(cudaEventRecord(start, stream));
         hash<block_size><<<grid_size, block_size, 0 /* shared memory */, stream>>>(i, d_blocks);
+        CHECK_CUDA(cudaGetLastError());
         CHECK_CUDA(cudaEventRecord(stop, stream));
 
         CHECK_CUDA(cudaEventSynchronize(stop));
         float milliseconds{};
         CHECK_CUDA(cudaEventElapsedTime(&milliseconds, start, stop));
 
-        const double hash_count = static_cast<double>(grid_size) * block_size * 26 * 26 * 26;
+        const double hash_count = static_cast<double>(grid_size) * block_size * 26 * 26 * 26 * 26;
         const double seconds    = milliseconds / 1000.;
-        printf("%eGH/s\n", hash_count / seconds / 1.e9);
+        printf("%fGH/s\n", hash_count / seconds / 1.e9);
 
         // TODO improve performance by only doing check at the end
         std::vector<block_t> h_blocks(grid_size);
@@ -315,8 +340,8 @@ int main()
             hash_t hash{};
             sha256(hash, h_blocks[i]);
             if (less_than(hash, best_hash)) {
-                std::memcpy(&best_block, &(h_blocks[i]), sizeof(h_blocks[i]));
-                std::memcpy(&best_hash, &hash, sizeof(hash));
+                copy(best_block, h_blocks[i]);
+                copy(best_hash, hash);
                 print_input(best_block);
                 print_hash(best_hash);
             }

@@ -2,6 +2,17 @@
     "version": 3,
     "configurePresets": [
         {
+            "name": "release",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CUDA_FLAGS": "-Wall -Wextra",
+                "CMAKE_PREFIX_PATH": "/usr/local/cuda",
+                "CMAKE_CUDA_ARCHITECTURES": "75"
+            }
+        },
+        {
             "name": "relwithdebinfo",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/relwithdebinfo",
