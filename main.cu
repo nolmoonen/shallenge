@@ -191,6 +191,11 @@ __forceinline__ __device__ __host__ void copy(hash_t& dst, const hash_t& src)
     std::memcpy(dst.arr, src.arr, sizeof(dst.arr));
 }
 
+__forceinline__ __device__ __host__ void set_worst_hash_value(hash_t& hash)
+{
+    std::memset(&hash, 0xff, sizeof(hash_t));
+}
+
 template <int block_size>
 __global__ void hash(int iteration, block_t* blocks)
 {
@@ -215,7 +220,7 @@ __global__ void hash(int iteration, block_t* blocks)
     block.arr[num_inputs_u32 - 2] = encode(idx);
 
     hash_t best_hash{};
-    std::memset(&best_hash, 0xff, sizeof(hash_t));
+    set_worst_hash_value(best_hash);
     block_t best_block{};
 
     // set the last u32 to the items handled by this thread
@@ -314,24 +319,31 @@ int main()
 
     block_t best_block{};
     hash_t best_hash;
-    std::memset(&best_hash, 0xff, sizeof(hash_t));
+    set_worst_hash_value(best_hash);
 
-    const int num_iterations = 1;
-    for (int i = 0; i < num_iterations; ++i) {
+    const int num_batches = 100;
+    for (int i = 0; i < num_batches; ++i) {
+        // process in batches to reduce synchronization overhead
         CHECK_CUDA(cudaEventRecord(start, stream));
-        hash<block_size><<<grid_size, block_size, 0 /* shared memory */, stream>>>(i, d_blocks);
-        CHECK_CUDA(cudaGetLastError());
+
+        const int num_iters_per_batch = 2;
+        for (int j = 0; j < num_iters_per_batch; ++j) {
+            const int iteration = num_iters_per_batch * i + j;
+            hash<block_size>
+                <<<grid_size, block_size, 0 /* shared memory */, stream>>>(iteration, d_blocks);
+            CHECK_CUDA(cudaGetLastError());
+        }
         CHECK_CUDA(cudaEventRecord(stop, stream));
 
         CHECK_CUDA(cudaEventSynchronize(stop));
         float milliseconds{};
         CHECK_CUDA(cudaEventElapsedTime(&milliseconds, start, stop));
 
-        const double hash_count = static_cast<double>(grid_size) * block_size * 26 * 26 * 26 * 26;
-        const double seconds    = milliseconds / 1000.;
-        printf("%fGH/s\n", hash_count / seconds / 1.e9);
+        const double hash_count =
+            static_cast<double>(num_iters_per_batch) * grid_size * block_size * 26 * 26 * 26 * 26;
+        const double seconds = milliseconds / 1000.;
+        printf("%fGH/s (%fms)\n", hash_count / seconds / 1.e9, milliseconds);
 
-        // TODO improve performance by only doing check at the end
         std::vector<block_t> h_blocks(grid_size);
         CHECK_CUDA(cudaMemcpy(
             h_blocks.data(), d_blocks, grid_size * sizeof(block_t), cudaMemcpyDeviceToHost));
