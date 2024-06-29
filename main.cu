@@ -1,6 +1,7 @@
 #include <cub/block/block_reduce.cuh>
 
 #include <cassert>
+#include <cstdlib>
 #include <cstring>
 #include <cuda_runtime.h>
 #include <limits>
@@ -197,7 +198,7 @@ __forceinline__ __device__ __host__ void set_worst_hash_value(hash_t& hash)
 }
 
 template <int block_size>
-__global__ void hash(int iteration, block_t* blocks)
+__global__ void hash(int seed, int iteration, block_t* blocks)
 {
     // initialize the block to a default state
     block_t block;
@@ -211,6 +212,9 @@ __global__ void hash(int iteration, block_t* blocks)
     block.arr[block_size_u32 - 2] = 0;
     // length, 64 - 8 - 4 = 52 * 8 = 416 in u32 big endian
     block.arr[block_size_u32 - 1] = uint32_t{416};
+
+    // set the fourth to last u32 to the seed
+    block.arr[num_inputs_u32 - 4] = encode(seed);
 
     // set the third to last u32 to the iteration number
     block.arr[num_inputs_u32 - 3] = encode(iteration);
@@ -301,8 +305,14 @@ void print_hash(const hash_t& hash)
     printf("\n");
 }
 
-int main()
+int main(int argc, char* argv[])
 {
+    int seed = 0;
+    if (argc > 1) {
+        seed = std::strtol(argv[1], nullptr, 10);
+    }
+    printf("seed %d\n", seed);
+
     cudaStream_t stream;
     CHECK_CUDA(cudaStreamCreate(&stream));
 
@@ -329,8 +339,8 @@ int main()
         const int num_iters_per_batch = 2;
         for (int j = 0; j < num_iters_per_batch; ++j) {
             const int iteration = num_iters_per_batch * i + j;
-            hash<block_size>
-                <<<grid_size, block_size, 0 /* shared memory */, stream>>>(iteration, d_blocks);
+            hash<block_size><<<grid_size, block_size, 0 /* shared memory */, stream>>>(
+                seed, iteration, d_blocks);
             CHECK_CUDA(cudaGetLastError());
         }
         CHECK_CUDA(cudaEventRecord(stop, stream));
