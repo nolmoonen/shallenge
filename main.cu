@@ -1,6 +1,8 @@
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <limits>
 
 constexpr uint32_t k[64] = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -18,6 +20,11 @@ constexpr int block_size_u8  = 512 / 8;
 constexpr int num_inputs_u8  = block_size_u8 - 8 - 4; // len in u64 and bit padding in u32
 constexpr int num_inputs_u32 = num_inputs_u8 / 4;
 
+using block_t = uint32_t[block_size_u32]; // hash algorithm input
+using hash_t  = uint32_t[hash_size_u32]; // hash algorithm output, each byte is a hexadecimal value
+/// \brief Represents one big 128-bits unsigned integer, lower is a better score.
+using score_t = uint32_t[hash_size_u32];
+
 uint32_t rotr(uint32_t a, int b) { return (a >> b) | (a << (32 - b)); }
 uint32_t ch(uint32_t x, uint32_t y, uint32_t z) { return (x & y) ^ (~x & z); }
 uint32_t maj(uint32_t x, uint32_t y, uint32_t z) { return (x & y) ^ (x & z) ^ (y & z); }
@@ -33,7 +40,7 @@ uint32_t swap_endian(uint32_t x)
            (uint32_t{ptr[0]} << 24);
 }
 
-void sha256(uint32_t (&hash)[hash_size_u32], const uint32_t (&block)[block_size_u32])
+void sha256(hash_t& hash, const block_t& block)
 {
     uint32_t m[64];
     for (int i = 0; i < block_size_u32; ++i) {
@@ -85,12 +92,7 @@ void sha256(uint32_t (&hash)[hash_size_u32], const uint32_t (&block)[block_size_
     hash[7] = swap_endian(hash[7] + h);
 }
 
-void do_hash(const uint32_t (&block)[block_size_u32], uint32_t (&hash)[hash_size_u32])
-{
-    sha256(hash, block);
-}
-
-void print_input(const uint32_t (&block)[block_size_u32])
+void print_input(const block_t& block)
 {
     for (int i = 0; i < num_inputs_u32; ++i) {
         const uint32_t tmp = swap_endian(block[i]);
@@ -101,12 +103,47 @@ void print_input(const uint32_t (&block)[block_size_u32])
     printf("\n");
 }
 
-void print_hash(uint32_t (&hash)[hash_size_u32])
+void print_hash(const hash_t& hash)
 {
-    for (int i = 0; i < 256 / 8; ++i) {
-        printf("%02x", reinterpret_cast<const uint8_t*>(hash)[i]);
+    for (int i = 0; i < 8; ++i) {
+        printf("%08x", swap_endian(hash[i]));
     }
-    printf(": %u\n", swap_endian(hash[0])); // score, lower is better
+    printf("\n");
+}
+
+void score_hash(score_t& score, const hash_t& hash)
+{
+    for (int i = 0; i < 4; ++i) {
+        uint32_t tmp{};
+        for (int j = 0; j < 8; ++j) {
+            const uint8_t val = reinterpret_cast<const uint8_t*>(hash)[8 * i + j];
+            // for (int k = 0; k < 2; ++k)
+            // {
+            //     const uint8_t hex = val >> (k - i - 1) * 4;
+            // [[maybe_unused]] const bool is_digit            = 48 <= hex && hex <= 57;
+            // [[maybe_unused]] const bool is_lowercase_xdigit = 97 <= hex && hex <= 102;
+            // assert(is_digit || is_lowercase_xdigit);
+            // const uint8_t val = hex < 58 ? hex - 48 : hex - 97 + 10;
+            // assert(val < 16);
+            tmp |= val << (8 - j - 1) * 4;
+            // }
+        }
+        score[i] = tmp;
+    }
+}
+
+bool less_than(const hash_t& lhs, const hash_t& rhs)
+{
+    for (int i = 0; i < 4; ++i) {
+        const uint32_t lhs_u32 = swap_endian(lhs[i]);
+        const uint32_t rhs_u32 = swap_endian(rhs[i]);
+        if (lhs_u32 < rhs_u32) {
+            return true;
+        } else if (rhs_u32 < lhs_u32) {
+            return false;
+        }
+    }
+    return false;
 }
 
 uint8_t base64_to_ascii(int x)
@@ -127,16 +164,29 @@ int main()
     // length, 64 - 8 - 4 = 52 * 8 = 416 in u32 big endian
     block[block_size_u32 - 1] = uint32_t{416};
 
+    hash_t best_hash{};
+    std::fill(best_hash, best_hash + 8, std::numeric_limits<uint32_t>::max());
+
     for (int i = 0; i < 64; ++i) {
-        const uint8_t val         = base64_to_ascii(i);
-        const uint32_t cur        = block[num_inputs_u32 - 1] & 0xffffff00;
-        block[num_inputs_u32 - 1] = cur | val;
+        const uint32_t mask_i = base64_to_ascii(i) << 24;
+        for (int j = 0; j < 64; ++j) {
+            const uint32_t mask_j = base64_to_ascii(j) << 16;
+            for (int k = 0; k < 64; ++k) {
+                const uint32_t mask_k = base64_to_ascii(k) << 8;
+                for (int l = 0; l < 64; ++l) {
+                    const uint32_t mask_l     = base64_to_ascii(k);
+                    block[num_inputs_u32 - 1] = mask_i | mask_j | mask_k | mask_l;
 
-        print_input(block);
+                    uint32_t hash[hash_size_u32];
+                    sha256(hash, block);
 
-        uint32_t hash[hash_size_u32];
-        sha256(hash, block);
-
-        print_hash(hash);
+                    if (less_than(hash, best_hash)) {
+                        print_input(block);
+                        std::memcpy(best_hash, hash, sizeof(hash));
+                        print_hash(hash);
+                    }
+                }
+            }
+        }
     }
 }
