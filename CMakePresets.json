@@ -8,7 +8,8 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo",
                 "CMAKE_CUDA_FLAGS": "-Wall -Wextra --generate-line-info",
-                "CMAKE_PREFIX_PATH": "/usr/local/cuda"
+                "CMAKE_PREFIX_PATH": "/usr/local/cuda",
+                "CMAKE_CUDA_ARCHITECTURES": "75"
             }
         },
         {
@@ -18,7 +19,8 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_CUDA_FLAGS": "-Wall -Wextra --generate-line-info",
-                "CMAKE_PREFIX_PATH": "/usr/local/cuda"
+                "CMAKE_PREFIX_PATH": "/usr/local/cuda",
+                "CMAKE_CUDA_ARCHITECTURES": "75"
             }
         }
     ]
