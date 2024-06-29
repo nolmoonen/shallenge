@@ -182,7 +182,7 @@ __global__ void hash(int iteration, block_t* blocks)
     block.arr[block_size_u32 - 1] = uint32_t{416};
 
     // set the third to last u32 to the iteration number
-    block.arr[num_inputs_u32 - 2] = encode(iteration);
+    block.arr[num_inputs_u32 - 3] = encode(iteration);
 
     // set the second to last u32 to the thread id
     const int idx                 = blockDim.x * blockIdx.x + threadIdx.x;
@@ -288,34 +288,42 @@ int main()
     block_t* d_blocks{};
     CHECK_CUDA(cudaMalloc(&d_blocks, grid_size * sizeof(block_t)));
 
-    CHECK_CUDA(cudaEventRecord(start, stream));
-    hash<block_size><<<grid_size, block_size, 0 /* shared memory */, stream>>>(0, d_blocks);
-    CHECK_CUDA(cudaEventRecord(stop, stream));
-
-    CHECK_CUDA(cudaEventSynchronize(stop));
-    float milliseconds{};
-    CHECK_CUDA(cudaEventElapsedTime(&milliseconds, start, stop));
-
-    const double hash_count = static_cast<double>(grid_size) * block_size * 26 * 26 * 26;
-    const double seconds    = milliseconds / 1000.;
-    printf("%eGH/s\n", hash_count / seconds / 1.e9);
-
-    std::vector<block_t> h_blocks(grid_size);
-    CHECK_CUDA(
-        cudaMemcpy(h_blocks.data(), d_blocks, grid_size * sizeof(block_t), cudaMemcpyDeviceToHost));
-
     block_t best_block{};
     hash_t best_hash;
     std::memset(&best_hash, 0xff, sizeof(hash_t));
-    for (int i = 0; i < grid_size; ++i) {
-        hash_t hash{};
-        sha256(hash, h_blocks[i]);
-        if (less_than(hash, best_hash)) {
-            std::memcpy(&best_block, &(h_blocks[i]), sizeof(h_blocks[i]));
-            std::memcpy(&best_hash, &hash, sizeof(hash));
+
+    const int num_iterations = 256;
+    for (int i = 0; i < num_iterations; ++i) {
+        CHECK_CUDA(cudaEventRecord(start, stream));
+        hash<block_size><<<grid_size, block_size, 0 /* shared memory */, stream>>>(i, d_blocks);
+        CHECK_CUDA(cudaEventRecord(stop, stream));
+
+        CHECK_CUDA(cudaEventSynchronize(stop));
+        float milliseconds{};
+        CHECK_CUDA(cudaEventElapsedTime(&milliseconds, start, stop));
+
+        const double hash_count = static_cast<double>(grid_size) * block_size * 26 * 26 * 26;
+        const double seconds    = milliseconds / 1000.;
+        printf("%eGH/s\n", hash_count / seconds / 1.e9);
+
+        // TODO improve performance by only doing check at the end
+        std::vector<block_t> h_blocks(grid_size);
+        CHECK_CUDA(cudaMemcpy(
+            h_blocks.data(), d_blocks, grid_size * sizeof(block_t), cudaMemcpyDeviceToHost));
+
+        for (int i = 0; i < grid_size; ++i) {
+            hash_t hash{};
+            sha256(hash, h_blocks[i]);
+            if (less_than(hash, best_hash)) {
+                std::memcpy(&best_block, &(h_blocks[i]), sizeof(h_blocks[i]));
+                std::memcpy(&best_hash, &hash, sizeof(hash));
+                print_input(best_block);
+                print_hash(best_hash);
+            }
         }
     }
 
+    printf("final result:\n");
     print_input(best_block);
     print_hash(best_hash);
 
