@@ -68,9 +68,13 @@ __forceinline__ __device__ __host__ uint32_t sig1(uint32_t x)
 
 __forceinline__ __device__ __host__ uint32_t swap_endian(uint32_t x)
 {
+#ifdef __CUDA_ARCH__
+    return __byte_perm(x, uint32_t{0}, uint32_t{0x0123});
+#else
     const uint8_t* ptr = reinterpret_cast<const uint8_t*>(&x);
     return uint32_t{ptr[3]} | (uint32_t{ptr[2]} << 8) | (uint32_t{ptr[1]} << 16) |
            (uint32_t{ptr[0]} << 24);
+#endif
 }
 
 __forceinline__ __device__ __host__ void sha256(hash_t& hash, const block_t& block)
@@ -101,6 +105,9 @@ __forceinline__ __device__ __host__ void sha256(hash_t& hash, const block_t& blo
     uint32_t g = hash.arr[6];
     uint32_t h = hash.arr[7];
 
+#ifdef __CUDA_ARCH__
+#pragma unroll
+#endif
     for (int i = 0; i < 64; ++i) {
         const uint32_t t1 = h + ep1(e) + ch(e, f, g) + k[i] + m[i];
         const uint32_t t2 = ep0(a) + maj(a, b, c);
@@ -186,18 +193,17 @@ __global__ void hash(int iteration, block_t* blocks)
     block_t best_block{};
 
     // set the last u32 to the items handled by this thread
+    constexpr int ascii_lowercase_a = 97;
     // for (int i = 0; i < 64; ++i)
     {
         const int i           = 0;
-        const uint32_t mask_i = base64_to_ascii(i) << 24;
-        // for (int j = 0; j < 64; ++j)
-        {
-            const int j           = 0;
-            const uint32_t mask_j = base64_to_ascii(j) << 16;
-            for (int k = 0; k < 64; ++k) {
-                const uint32_t mask_k = base64_to_ascii(k) << 8;
-                for (int l = 0; l < 64; ++l) {
-                    const uint32_t mask_l         = base64_to_ascii(k);
+        const uint32_t mask_i = (ascii_lowercase_a + i) << 24;
+        for (int j = 0; j < 26; ++j) {
+            const uint32_t mask_j = (ascii_lowercase_a + j) << 16;
+            for (int k = 0; k < 26; ++k) {
+                const uint32_t mask_k = (ascii_lowercase_a + k) << 8;
+                for (int l = 0; l < 26; ++l) {
+                    const uint32_t mask_l         = ascii_lowercase_a + l;
                     block.arr[num_inputs_u32 - 1] = mask_i | mask_j | mask_k | mask_l;
 
                     hash_t hash;
@@ -290,7 +296,9 @@ int main()
     float milliseconds{};
     CHECK_CUDA(cudaEventElapsedTime(&milliseconds, start, stop));
 
-    printf("elapsed: %fms\n", milliseconds);
+    const double hash_count = static_cast<double>(grid_size) * block_size * 26 * 26 * 26;
+    const double seconds    = milliseconds / 1000.;
+    printf("%eGH/s\n", hash_count / seconds / 1.e9);
 
     std::vector<block_t> h_blocks(grid_size);
     CHECK_CUDA(
