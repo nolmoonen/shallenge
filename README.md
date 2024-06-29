@@ -8,6 +8,7 @@ cmake --build build
 ```
 
 - Ubuntu 22.04.2 x86_64, CUDA 12.4 driver 550.54.14, NVIDIA GeForce RTX 2070: ~3.65GH/s
+- Ubuntu 22.04.3 x86_64, CUDA 11.8 driver 545.23.08, NVIDIA GeForce RTX 3090: ~7.71GH/s
 
 Best result:
 

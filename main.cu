@@ -151,7 +151,8 @@ __forceinline__ __device__ __host__ void sha256(hash_t& hash, const block_t& blo
 
 __forceinline__ __device__ __host__ bool less_than(const hash_t& lhs, const hash_t& rhs)
 {
-    for (int i = 0; i < 4; ++i) {
+    DEVICE_UNROLL
+    for (int i = 0; i < 8; ++i) {
         const uint32_t lhs_u32 = swap_endian(lhs.arr[i]);
         const uint32_t rhs_u32 = swap_endian(rhs.arr[i]);
         if (lhs_u32 < rhs_u32) {
@@ -198,7 +199,7 @@ __forceinline__ __device__ __host__ void set_worst_hash_value(hash_t& hash)
 }
 
 template <int block_size>
-__global__ void hash(int seed, int iteration, block_t* blocks)
+__global__ void __launch_bounds__(block_size) hash(int seed, int iteration, block_t* blocks)
 {
     // initialize the block to a default state
     block_t block;
