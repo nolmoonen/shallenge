@@ -22,14 +22,84 @@ __forceinline__ __device__ __host__ void sha256(hash_t& hash, const block_t& blo
     uint32_t g = 0x110dae68;
     uint32_t h = 0x6ed0d95b;
 
+    // finish the first 16 rounds using precalculated data
+    {
+        const uint32_t t1_10 = h + ep1(e) + ch(e, f, g) + k[10] + block.arr[10];
+        const uint32_t t2_10 = ep0(a) + maj(a, b, c);
+
+        h = g;
+        g = f;
+        f = e;
+        e = d + t1_10;
+        d = c;
+        c = b;
+        b = a;
+        a = t1_10 + t2_10;
+
+        const uint32_t t1_11 = h + ep1(e) + ch(e, f, g) + k[11] + block.arr[11];
+        const uint32_t t2_11 = ep0(a) + maj(a, b, c);
+
+        h = g;
+        g = f;
+        f = e;
+        e = d + t1_11;
+        d = c;
+        c = b;
+        b = a;
+        a = t1_11 + t2_11;
+
+        const uint32_t t1_12 = h + ep1(e) + ch(e, f, g) + k[12] + block.arr[12];
+        const uint32_t t2_12 = ep0(a) + maj(a, b, c);
+
+        h = g;
+        g = f;
+        f = e;
+        e = d + t1_12;
+        d = c;
+        c = b;
+        b = a;
+        a = t1_12 + t2_12;
+
+        const uint32_t t1_13 = h + ep1(e) + ch(e, f, g) + k[13] + m13;
+        const uint32_t t2_13 = ep0(a) + maj(a, b, c);
+
+        h = g;
+        g = f;
+        f = e;
+        e = d + t1_13;
+        d = c;
+        c = b;
+        b = a;
+        a = t1_13 + t2_13;
+
+        const uint32_t t1_14 = h + ep1(e) + ch(e, f, g) + k[14] + m14;
+        const uint32_t t2_14 = ep0(a) + maj(a, b, c);
+
+        h = g;
+        g = f;
+        f = e;
+        e = d + t1_14;
+        d = c;
+        c = b;
+        b = a;
+        a = t1_14 + t2_14;
+
+        const uint32_t t1_15 = h + ep1(e) + ch(e, f, g) + k[15] + m15;
+        const uint32_t t2_15 = ep0(a) + maj(a, b, c);
+
+        h = g;
+        g = f;
+        f = e;
+        e = d + t1_15;
+        d = c;
+        c = b;
+        b = a;
+        a = t1_15 + t2_15;
+    }
+
     uint32_t m[16];
     std::memcpy(m, block.arr, sizeof(m));
 
-    // finish the first 16 rounds using precalculated data
-    DEVICE_UNROLL
-    for (int i = 10; i < 16; ++i) {
-        sha256_round(m, a, b, c, d, e, f, g, h, 0, i);
-    }
     // perform the remaining 48 rounds
     DEVICE_UNROLL
     for (int i = 0; i < 16; ++i) {

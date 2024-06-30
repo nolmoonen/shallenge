@@ -127,21 +127,32 @@ __forceinline__ __device__ __host__ uint32_t swap_endian(uint32_t x)
 #endif
 }
 
+constexpr uint32_t m0  = 0x6e6f6c2f; // 'nol/'
+constexpr uint32_t m1  = 0x30303030; // '0000'
+constexpr uint32_t m2  = 0x30303030;
+constexpr uint32_t m3  = 0x30303030;
+constexpr uint32_t m4  = 0x30303030;
+constexpr uint32_t m5  = 0x30303030;
+constexpr uint32_t m6  = 0x30303030;
+constexpr uint32_t m7  = 0x30303030;
+constexpr uint32_t m8  = 0x30303030;
+constexpr uint32_t m9  = 0x30303030;
+constexpr uint32_t m13 = 0x80000000; // swap_endian(uint32_t{0x80}), single bit padding
+constexpr uint32_t m14 = 0x00000000; // upper part of u64 size
+constexpr uint32_t m15 = 0x000001a0; // length, 64 - 8 - 4 = 52 * 8 = 416 in u32 big endian
+
 __forceinline__ __device__ __host__ void set_common(block_t& block)
 {
-    block.arr[0] =
-        uint32_t{'n'} << 24 | (uint32_t{'o'} << 16) | (uint32_t{'l'} << 8) | (uint32_t{'/'});
+    block.arr[0] = 0x6e6f6c2f;
     for (int i = 0; i < 9; ++i) {
-        block.arr[1 + i] =
-            uint32_t{'0'} | (uint32_t{'0'} << 8) | (uint32_t{'0'} << 16) | (uint32_t{'0'} << 24);
+        block.arr[1 + i] = 0x30303030;
     }
     // block.arr[10] iteration index
     // block.arr[11] thread index
     // block.arr[12] determined by thread
-    block.arr[13] = swap_endian(uint32_t{0x80}); // single bit padding
-    block.arr[14] = 0;
-    // length, 64 - 8 - 4 = 52 * 8 = 416 in u32 big endian
-    block.arr[15] = uint32_t{416};
+    block.arr[13] = m13;
+    block.arr[14] = m14;
+    block.arr[15] = m15;
 }
 
 #endif // SHALLENGE_COMMON_CUH_

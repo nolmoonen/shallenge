@@ -28,4 +28,14 @@ int main()
     printf("uint32_t f = 0x%08x;\n", f);
     printf("uint32_t g = 0x%08x;\n", g);
     printf("uint32_t h = 0x%08x;\n", h);
+
+    for (int i = 0; i < 16; ++i) {
+        printf(
+            "m[%d] = f(m[%d], m[%d], m[%d], m[%d]);\n",
+            i,
+            (i + 16 - 2) % 16,
+            (i + 16 - 7) % 16,
+            (i + 16 - 15) % 16,
+            (i + 16 - 16) % 16);
+    }
 }
