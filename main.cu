@@ -97,13 +97,27 @@ __forceinline__ __device__ __host__ void sha256(hash_t& hash, const block_t& blo
         a = t1_15 + t2_15;
     }
 
-    uint32_t m[16];
-    std::memcpy(m, block.arr, sizeof(m));
+    uint32_t m[16] = {
+        m16,
+        sha256_update_m_(m15, block.arr[10], m2, m1),
+        sha256_update_m_(m0, block.arr[11], m3, m2),
+        sha256_update_m_(m1, block.arr[12], m4, m3),
+        m20,
+        m21,
+        m22,
+        m23,
+        m24,
+        sha256_update_m_(m7, m2, block.arr[10], m9),
+        sha256_update_m_(m8, m3, block.arr[11], block.arr[10]),
+        sha256_update_m_(m9, m4, block.arr[12], block.arr[11]),
+        sha256_update_m_(block.arr[10], m5, m13, block.arr[12]),
+        sha256_update_m_(block.arr[11], m6, m14, m13),
+        sha256_update_m_(block.arr[12], m7, m15, m14),
+        m31};
 
     // perform the remaining 48 rounds
     DEVICE_UNROLL
     for (int i = 0; i < 16; ++i) {
-        sha256_update_m(m, i);
         sha256_round(m, a, b, c, d, e, f, g, h, 16, i);
     }
     DEVICE_UNROLL
