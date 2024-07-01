@@ -13,122 +13,67 @@
 
 __forceinline__ __device__ __host__ void sha256(hash_t& hash, const block_t& block)
 {
-    uint32_t a = 0xd6d54205;
-    uint32_t b = 0x06cc1c4a;
-    uint32_t c = 0xf2df215f;
-    uint32_t d = 0x106b42e3;
-    uint32_t e = 0xb2368541;
-    uint32_t f = 0x1b7e592a;
-    uint32_t g = 0x110dae68;
-    uint32_t h = 0x6ed0d95b;
+    uint32_t a = aa;
+    uint32_t b = bb;
+    uint32_t c = cc;
+    uint32_t d = dd;
+    uint32_t e = ee;
+    uint32_t f = ff;
+    uint32_t g = gg;
+    uint32_t h = hh;
 
     // finish the first 16 rounds using precalculated data
-    {
-        const uint32_t t1_10 = h + ep1(e) + ch(e, f, g) + k[10] + block.arr[10];
-        const uint32_t t2_10 = ep0(a) + maj(a, b, c);
+    sha256_round(m0, k[0], a, b, c, d, e, f, g, h);
+    sha256_round(m1, k[1], a, b, c, d, e, f, g, h);
+    sha256_round(m2, k[2], a, b, c, d, e, f, g, h);
+    sha256_round(m3, k[3], a, b, c, d, e, f, g, h);
+    sha256_round(m4, k[4], a, b, c, d, e, f, g, h);
+    sha256_round(m5, k[5], a, b, c, d, e, f, g, h);
+    sha256_round(m6, k[6], a, b, c, d, e, f, g, h);
+    sha256_round(m7, k[7], a, b, c, d, e, f, g, h);
+    sha256_round(m8, k[8], a, b, c, d, e, f, g, h);
+    sha256_round(m9, k[9], a, b, c, d, e, f, g, h);
+    sha256_round(block.arr[10], k[10], a, b, c, d, e, f, g, h);
+    sha256_round(block.arr[11], k[11], a, b, c, d, e, f, g, h);
+    sha256_round(block.arr[12], k[12], a, b, c, d, e, f, g, h);
+    sha256_round(m13, k[13], a, b, c, d, e, f, g, h);
+    sha256_round(m14, k[14], a, b, c, d, e, f, g, h);
+    sha256_round(m15, k[15], a, b, c, d, e, f, g, h);
 
-        h = g;
-        g = f;
-        f = e;
-        e = d + t1_10;
-        d = c;
-        c = b;
-        b = a;
-        a = t1_10 + t2_10;
-
-        const uint32_t t1_11 = h + ep1(e) + ch(e, f, g) + k[11] + block.arr[11];
-        const uint32_t t2_11 = ep0(a) + maj(a, b, c);
-
-        h = g;
-        g = f;
-        f = e;
-        e = d + t1_11;
-        d = c;
-        c = b;
-        b = a;
-        a = t1_11 + t2_11;
-
-        const uint32_t t1_12 = h + ep1(e) + ch(e, f, g) + k[12] + block.arr[12];
-        const uint32_t t2_12 = ep0(a) + maj(a, b, c);
-
-        h = g;
-        g = f;
-        f = e;
-        e = d + t1_12;
-        d = c;
-        c = b;
-        b = a;
-        a = t1_12 + t2_12;
-
-        const uint32_t t1_13 = h + ep1(e) + ch(e, f, g) + k[13] + m13;
-        const uint32_t t2_13 = ep0(a) + maj(a, b, c);
-
-        h = g;
-        g = f;
-        f = e;
-        e = d + t1_13;
-        d = c;
-        c = b;
-        b = a;
-        a = t1_13 + t2_13;
-
-        const uint32_t t1_14 = h + ep1(e) + ch(e, f, g) + k[14] + m14;
-        const uint32_t t2_14 = ep0(a) + maj(a, b, c);
-
-        h = g;
-        g = f;
-        f = e;
-        e = d + t1_14;
-        d = c;
-        c = b;
-        b = a;
-        a = t1_14 + t2_14;
-
-        const uint32_t t1_15 = h + ep1(e) + ch(e, f, g) + k[15] + m15;
-        const uint32_t t2_15 = ep0(a) + maj(a, b, c);
-
-        h = g;
-        g = f;
-        f = e;
-        e = d + t1_15;
-        d = c;
-        c = b;
-        b = a;
-        a = t1_15 + t2_15;
-    }
+    uint32_t m16 = sha256_update_m_(m14, m9, m1, m0);
+    uint32_t m17 = sha256_update_m_(m15, block.arr[10], m2, m1);
+    uint32_t m18 = sha256_update_m_(m16, block.arr[11], m3, m2);
+    uint32_t m19 = sha256_update_m_(m17, block.arr[12], m4, m3);
+    uint32_t m20 = sha256_update_m_(m18, m13, m5, m4);
+    uint32_t m21 = sha256_update_m_(m19, m14, m6, m5);
+    uint32_t m22 = sha256_update_m_(m20, m15, m7, m6);
+    uint32_t m23 = sha256_update_m_(m21, m16, m8, m7);
+    uint32_t m24 = sha256_update_m_(m22, m17, m9, m8);
+    uint32_t m25 = sha256_update_m_(m23, m18, block.arr[10], m9);
+    uint32_t m26 = sha256_update_m_(m24, m19, block.arr[11], block.arr[10]);
+    uint32_t m27 = sha256_update_m_(m25, m20, block.arr[12], block.arr[11]);
+    uint32_t m28 = sha256_update_m_(m26, m21, m13, block.arr[12]);
+    uint32_t m29 = sha256_update_m_(m27, m22, m14, m13);
+    uint32_t m30 = sha256_update_m_(m28, m23, m15, m14);
+    uint32_t m31 = sha256_update_m_(m29, m24, m16, m15);
 
     uint32_t m[16] = {
-        m16,
-        sha256_update_m_(m15, block.arr[10], m2, m1),
-        sha256_update_m_(m0, block.arr[11], m3, m2),
-        sha256_update_m_(m1, block.arr[12], m4, m3),
-        m20,
-        m21,
-        m22,
-        m23,
-        m24,
-        sha256_update_m_(m7, m2, block.arr[10], m9),
-        sha256_update_m_(m8, m3, block.arr[11], block.arr[10]),
-        sha256_update_m_(m9, m4, block.arr[12], block.arr[11]),
-        sha256_update_m_(block.arr[10], m5, m13, block.arr[12]),
-        sha256_update_m_(block.arr[11], m6, m14, m13),
-        sha256_update_m_(block.arr[12], m7, m15, m14),
-        m31};
+        m16, m17, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27, m28, m29, m30, m31};
 
     // perform the remaining 48 rounds
     DEVICE_UNROLL
     for (int i = 0; i < 16; ++i) {
-        sha256_round(m, a, b, c, d, e, f, g, h, 16, i);
+        sha256_round(m[i], k[16 + i], a, b, c, d, e, f, g, h);
     }
     DEVICE_UNROLL
     for (int i = 0; i < 16; ++i) {
         sha256_update_m(m, i);
-        sha256_round(m, a, b, c, d, e, f, g, h, 32, i);
+        sha256_round(m[i], k[32 + i], a, b, c, d, e, f, g, h);
     }
     DEVICE_UNROLL
     for (int i = 0; i < 16; ++i) {
         sha256_update_m(m, i);
-        sha256_round(m, a, b, c, d, e, f, g, h, 48, i);
+        sha256_round(m[i], k[48 + i], a, b, c, d, e, f, g, h);
     }
 
     hash.arr[0] = swap_endian(aa + a);

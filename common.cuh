@@ -85,7 +85,8 @@ __forceinline__ __device__ __host__ uint32_t sig1(uint32_t x)
 }
 
 __forceinline__ __device__ __host__ void sha256_round(
-    uint32_t (&m)[16],
+    uint32_t m,
+    uint32_t k,
     uint32_t& a,
     uint32_t& b,
     uint32_t& c,
@@ -93,11 +94,9 @@ __forceinline__ __device__ __host__ void sha256_round(
     uint32_t& e,
     uint32_t& f,
     uint32_t& g,
-    uint32_t& h,
-    int offset,
-    int i)
+    uint32_t& h)
 {
-    const uint32_t t1 = h + ep1(e) + ch(e, f, g) + k[offset + i] + m[i];
+    const uint32_t t1 = h + ep1(e) + ch(e, f, g) + k + m;
     const uint32_t t2 = ep0(a) + maj(a, b, c);
 
     h = g;
@@ -133,34 +132,26 @@ __forceinline__ __device__ __host__ uint32_t swap_endian(uint32_t x)
 #endif
 }
 
-constexpr uint32_t m0  = 0x6e6f6c2f; // 'nol/'
-constexpr uint32_t m1  = 0x30303030; // '0000'
-constexpr uint32_t m2  = 0x30303030;
-constexpr uint32_t m3  = 0x30303030;
-constexpr uint32_t m4  = 0x30303030;
-constexpr uint32_t m5  = 0x30303030;
-constexpr uint32_t m6  = 0x30303030;
-constexpr uint32_t m7  = 0x30303030;
-constexpr uint32_t m8  = 0x30303030;
-constexpr uint32_t m9  = 0x30303030;
+constexpr uint32_t m0 = 0x6e6f6c2f; // 'nol/'
+constexpr uint32_t m1 = 0x30303030; // '0000'
+constexpr uint32_t m2 = 0x30303030;
+constexpr uint32_t m3 = 0x30303030;
+constexpr uint32_t m4 = 0x30303030;
+constexpr uint32_t m5 = 0x30303030;
+constexpr uint32_t m6 = 0x30303030;
+constexpr uint32_t m7 = 0x30303030;
+constexpr uint32_t m8 = 0x30303030;
+constexpr uint32_t m9 = 0x30303030;
 // TODO can pack this with m12 and let the thread do 64^3 instead of 26^4
 constexpr uint32_t m13 = 0x80000000; // swap_endian(uint32_t{0x80}), single bit padding
 constexpr uint32_t m14 = 0x00000000; // upper part of u64 size
 constexpr uint32_t m15 = 0x000001a0; // length, 64 - 8 - 4 = 52 * 8 = 416 in u32 big endian
 
-constexpr uint32_t m16 = 0x090a06c9; // f(m14, m9, m1, m0)
-constexpr uint32_t m20 = 0x2b8bdce0; // f(m2, m13, m5, m4)
-constexpr uint32_t m21 = 0xdc1eced0; // f(m3, m14, m6, m5)
-constexpr uint32_t m22 = 0x30818e7d; // f(m4, m15, m7, m6)
-constexpr uint32_t m23 = 0x622a13a2; // f(m5, m0, m8, m7)
-constexpr uint32_t m24 = 0x2d165370; // f(m6, m1, m9, m8)
-constexpr uint32_t m31 = 0x052425cf; // f(m13, m8, m0, m15)
-
 __forceinline__ __device__ __host__ void set_common(block_t& block)
 {
-    block.arr[0] = 0x6e6f6c2f;
+    block.arr[0] = m0;
     for (int i = 0; i < 9; ++i) {
-        block.arr[1 + i] = 0x30303030;
+        block.arr[1 + i] = m1;
     }
     // block.arr[10] iteration index
     // block.arr[11] thread index

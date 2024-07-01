@@ -17,7 +17,7 @@ int main()
     uint32_t h = hh;
 
     for (int i = 0; i < 10; ++i) {
-        sha256_round(block.arr, a, b, c, d, e, f, g, h, 0, i);
+        sha256_round(block.arr[i], k[i], a, b, c, d, e, f, g, h);
     }
 
     printf("uint32_t a = 0x%08x;\n", a);
@@ -30,18 +30,14 @@ int main()
     printf("uint32_t h = 0x%08x;\n", h);
 
     for (int i = 0; i < 16; ++i) {
-        const int i2  = (i + 16 - 2) % 16;
-        const int i7  = (i + 16 - 7) % 16;
-        const int i15 = (i + 16 - 15) % 16;
-        const int i16 = (i + 16 - 16) % 16;
-        printf(
-            "constexpr uint32_t m%d = 0x%08x; // f(m%d, m%d, m%d, m%d)\n",
-            16 + i,
-            block.arr[i] =
-                sha256_update_m_(block.arr[i2], block.arr[i7], block.arr[i15], block.arr[i16]),
-            i2,
-            i7,
-            i15,
-            i16);
+        int i2  = (i + 16 - 2) % 16;
+        i2      = i2 < i ? i2 + 16 : i2;
+        int i7  = (i + 16 - 7) % 16;
+        i7      = i7 < i ? i7 + 16 : i7;
+        int i15 = (i + 16 - 15) % 16;
+        i15     = i15 < i ? i15 + 16 : i15;
+        int i16 = (i + 16 - 16) % 16;
+        i16     = i16 < i ? i16 + 16 : i16;
+        printf("uint32_t m%d = sha256_update_m_(m%d, m%d, m%d, m%d);\n", 16 + i, i2, i7, i15, i16);
     }
 }
