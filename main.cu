@@ -61,11 +61,15 @@ __forceinline__ __device__ __host__ uint32_t rotr(uint32_t a, int b)
 }
 __forceinline__ __device__ __host__ uint32_t ch(uint32_t x, uint32_t y, uint32_t z)
 {
-    return (x & y) ^ (~x & z);
+    // return (x & y) ^ (~x & z);
+    // https://github.com/hashcat/hashcat/blob/master/OpenCL/inc_hash_sha256.h
+    return z ^ (x & (y ^ z));
 }
 __forceinline__ __device__ __host__ uint32_t maj(uint32_t x, uint32_t y, uint32_t z)
 {
-    return (x & y) ^ (x & z) ^ (y & z);
+    // return (x & y) ^ (x & z) ^ (y & z);
+    // https://github.com/hashcat/hashcat/blob/master/OpenCL/inc_hash_sha256.h
+    return (x & y) | (z & (x ^ y));
 }
 __forceinline__ __device__ __host__ uint32_t ep0(uint32_t x)
 {
@@ -240,21 +244,25 @@ __forceinline__ __device__ __host__ bool less_than(const hash_t& lhs, const hash
     return false;
 }
 
+constexpr int base64_max = 62;
+
 __forceinline__ __device__ uint8_t base64_to_ascii(int x)
 {
-    return x < 26 ? 65 + x : x < 52 ? 71 + x : x < 62 ? x - 4 : x < 63 ? 43 : 47;
+    assert(0 <= x && x < 62);
+    __builtin_assume(0 <= x && x < 62);
+    return x < 26 ? 65 + x : x < 52 ? 71 + x : x - 4;
 }
 
-constexpr int max_thread_count = 64 * 64 * 64 * 64;
+constexpr int max_thread_count = base64_max * base64_max * base64_max * base64_max;
 
-/// \brief Encode a value in range [0, 64^4) to a u32 encoded as base64.
+/// \brief Encode a value in range [0, base64_max^4) to a u32 encoded as base64.
 __forceinline__ __device__ uint32_t encode(int val)
 {
     assert(0 <= val && val < max_thread_count);
     uint32_t ret{};
     for (int i = 0; i < 4; ++i) {
-        ret |= base64_to_ascii(val % 64) << i * 8;
-        val /= 64;
+        ret |= base64_to_ascii(val % base64_max) << i * 8;
+        val /= base64_max;
     }
     return ret;
 }
@@ -284,11 +292,11 @@ __global__ void __launch_bounds__(block_size) hash(int iteration, nonce_t* nonce
     uint32_t best_m13{};
 
     // set the last u32 to the items handled by this thread
-    for (int i = 0; i < 64; ++i) {
+    for (int i = 0; i < base64_max; ++i) {
         const uint32_t mask_i = base64_to_ascii(i) << 24;
-        for (int j = 0; j < 64; ++j) {
+        for (int j = 0; j < base64_max; ++j) {
             const uint32_t mask_j = base64_to_ascii(j) << 16;
-            for (int k = 0; k < 64; ++k) {
+            for (int k = 0; k < base64_max; ++k) {
                 const uint32_t mask_k = base64_to_ascii(k) << 8;
                 const uint32_t m13    = mask_i | mask_j | mask_k | uint32_t{0x80};
 
@@ -418,8 +426,8 @@ int main(int argc, char* argv[])
         float milliseconds{};
         CHECK_CUDA(cudaEventElapsedTime(&milliseconds, start, stop));
 
-        const double hash_count =
-            static_cast<double>(num_iters_per_batch) * grid_size * block_size * 64 * 64 * 64;
+        const double hash_count = static_cast<double>(num_iters_per_batch) * grid_size *
+                                  block_size * base64_max * base64_max * base64_max;
         const double seconds = milliseconds / 1000.;
         printf(
             "iter [%d, %d): %fGH/s (%fms)\n",
