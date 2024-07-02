@@ -38,9 +38,6 @@ constexpr uint32_t hh = 0x5be0cd19;
 
 constexpr int block_size_u32 = 512 / 32;
 constexpr int hash_size_u32  = 256 / 32;
-constexpr int block_size_u8  = 512 / 8;
-constexpr int num_inputs_u8  = block_size_u8 - 8 - 4; // len in u64 and bit padding in u32
-constexpr int num_inputs_u32 = num_inputs_u8 / 4;
 
 struct block_t {
     uint32_t arr[block_size_u32];
@@ -132,31 +129,39 @@ __forceinline__ __device__ __host__ uint32_t swap_endian(uint32_t x)
 #endif
 }
 
-constexpr uint32_t m0 = 0x6e6f6c2f; // 'nol/'
-constexpr uint32_t m1 = 0x30303030; // '0000'
-constexpr uint32_t m2 = 0x30303030;
-constexpr uint32_t m3 = 0x30303030;
-constexpr uint32_t m4 = 0x30303030;
-constexpr uint32_t m5 = 0x30303030;
-constexpr uint32_t m6 = 0x30303030;
-constexpr uint32_t m7 = 0x30303030;
-constexpr uint32_t m8 = 0x30303030;
-constexpr uint32_t m9 = 0x30303030;
-// TODO can pack this with m12 and let the thread do 64^3 instead of 26^4
-constexpr uint32_t m13 = 0x80000000; // swap_endian(uint32_t{0x80}), single bit padding
+constexpr uint32_t m00 = 0x6e6f6c2f; // 'nol/'
+constexpr uint32_t m01 = 0x30303030; // '0000'
+constexpr uint32_t m02 = 0x30303030;
+constexpr uint32_t m03 = 0x30303030;
+constexpr uint32_t m04 = 0x30303030;
+constexpr uint32_t m05 = 0x30303030;
+constexpr uint32_t m06 = 0x30303030;
+constexpr uint32_t m07 = 0x30303030;
+constexpr uint32_t m08 = 0x30303030;
+constexpr uint32_t m09 = 0x30303030;
+constexpr uint32_t m10 = 0x30303030;
+// m11 is iteration
+// m12 is thread index
+// m13 is thread variable and single bit padding
 constexpr uint32_t m14 = 0x00000000; // upper part of u64 size
-constexpr uint32_t m15 = 0x000001a0; // length, 64 - 8 - 4 = 52 * 8 = 416 in u32 big endian
+constexpr uint32_t m15 = 0x000001b8; // length, 64 - 8 - 1 = 55 * 8 = 440 in u32 big endian
 
 __forceinline__ __device__ __host__ void set_common(block_t& block)
 {
-    block.arr[0] = m0;
-    for (int i = 0; i < 9; ++i) {
-        block.arr[1 + i] = m1;
-    }
-    // block.arr[10] iteration index
-    // block.arr[11] thread index
-    // block.arr[12] determined by thread
-    block.arr[13] = m13;
+    block.arr[0]  = m00;
+    block.arr[1]  = m01;
+    block.arr[2]  = m02;
+    block.arr[3]  = m03;
+    block.arr[4]  = m04;
+    block.arr[5]  = m05;
+    block.arr[6]  = m06;
+    block.arr[7]  = m07;
+    block.arr[8]  = m08;
+    block.arr[9]  = m09;
+    block.arr[10] = m10;
+    // block.arr[11] iteration index
+    // block.arr[12] thread index
+    // block.arr[13] determined by thread
     block.arr[14] = m14;
     block.arr[15] = m15;
 }

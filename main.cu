@@ -23,37 +23,37 @@ __forceinline__ __device__ __host__ void sha256(hash_t& hash, const block_t& blo
     uint32_t h = hh;
 
     // finish the first 16 rounds using precalculated data
-    sha256_round(m0, k[0], a, b, c, d, e, f, g, h);
-    sha256_round(m1, k[1], a, b, c, d, e, f, g, h);
-    sha256_round(m2, k[2], a, b, c, d, e, f, g, h);
-    sha256_round(m3, k[3], a, b, c, d, e, f, g, h);
-    sha256_round(m4, k[4], a, b, c, d, e, f, g, h);
-    sha256_round(m5, k[5], a, b, c, d, e, f, g, h);
-    sha256_round(m6, k[6], a, b, c, d, e, f, g, h);
-    sha256_round(m7, k[7], a, b, c, d, e, f, g, h);
-    sha256_round(m8, k[8], a, b, c, d, e, f, g, h);
-    sha256_round(m9, k[9], a, b, c, d, e, f, g, h);
-    sha256_round(block.arr[10], k[10], a, b, c, d, e, f, g, h);
+    sha256_round(m00, k[0], a, b, c, d, e, f, g, h);
+    sha256_round(m01, k[1], a, b, c, d, e, f, g, h);
+    sha256_round(m02, k[2], a, b, c, d, e, f, g, h);
+    sha256_round(m03, k[3], a, b, c, d, e, f, g, h);
+    sha256_round(m04, k[4], a, b, c, d, e, f, g, h);
+    sha256_round(m05, k[5], a, b, c, d, e, f, g, h);
+    sha256_round(m06, k[6], a, b, c, d, e, f, g, h);
+    sha256_round(m07, k[7], a, b, c, d, e, f, g, h);
+    sha256_round(m08, k[8], a, b, c, d, e, f, g, h);
+    sha256_round(m09, k[9], a, b, c, d, e, f, g, h);
+    sha256_round(m10, k[10], a, b, c, d, e, f, g, h);
     sha256_round(block.arr[11], k[11], a, b, c, d, e, f, g, h);
     sha256_round(block.arr[12], k[12], a, b, c, d, e, f, g, h);
-    sha256_round(m13, k[13], a, b, c, d, e, f, g, h);
+    sha256_round(block.arr[13], k[13], a, b, c, d, e, f, g, h);
     sha256_round(m14, k[14], a, b, c, d, e, f, g, h);
     sha256_round(m15, k[15], a, b, c, d, e, f, g, h);
 
-    uint32_t m16 = sha256_update_m_(m14, m9, m1, m0);
-    uint32_t m17 = sha256_update_m_(m15, block.arr[10], m2, m1);
-    uint32_t m18 = sha256_update_m_(m16, block.arr[11], m3, m2);
-    uint32_t m19 = sha256_update_m_(m17, block.arr[12], m4, m3);
-    uint32_t m20 = sha256_update_m_(m18, m13, m5, m4);
-    uint32_t m21 = sha256_update_m_(m19, m14, m6, m5);
-    uint32_t m22 = sha256_update_m_(m20, m15, m7, m6);
-    uint32_t m23 = sha256_update_m_(m21, m16, m8, m7);
-    uint32_t m24 = sha256_update_m_(m22, m17, m9, m8);
-    uint32_t m25 = sha256_update_m_(m23, m18, block.arr[10], m9);
-    uint32_t m26 = sha256_update_m_(m24, m19, block.arr[11], block.arr[10]);
+    uint32_t m16 = sha256_update_m_(m14, m09, m01, m00);
+    uint32_t m17 = sha256_update_m_(m15, m10, m02, m01);
+    uint32_t m18 = sha256_update_m_(m16, block.arr[11], m03, m02);
+    uint32_t m19 = sha256_update_m_(m17, block.arr[12], m04, m03);
+    uint32_t m20 = sha256_update_m_(m18, block.arr[13], m05, m04);
+    uint32_t m21 = sha256_update_m_(m19, m14, m06, m05);
+    uint32_t m22 = sha256_update_m_(m20, m15, m07, m06);
+    uint32_t m23 = sha256_update_m_(m21, m16, m08, m07);
+    uint32_t m24 = sha256_update_m_(m22, m17, m09, m08);
+    uint32_t m25 = sha256_update_m_(m23, m18, m10, m09);
+    uint32_t m26 = sha256_update_m_(m24, m19, block.arr[11], m10);
     uint32_t m27 = sha256_update_m_(m25, m20, block.arr[12], block.arr[11]);
-    uint32_t m28 = sha256_update_m_(m26, m21, m13, block.arr[12]);
-    uint32_t m29 = sha256_update_m_(m27, m22, m14, m13);
+    uint32_t m28 = sha256_update_m_(m26, m21, block.arr[13], block.arr[12]);
+    uint32_t m29 = sha256_update_m_(m27, m22, m14, block.arr[13]);
     uint32_t m30 = sha256_update_m_(m28, m23, m15, m14);
     uint32_t m31 = sha256_update_m_(m29, m24, m16, m15);
 
@@ -143,35 +143,31 @@ __global__ void __launch_bounds__(block_size) hash(int iteration, block_t* block
     set_common(block);
 
     // set the third to last u32 to the iteration number
-    block.arr[num_inputs_u32 - 3] = encode(iteration);
+    block.arr[11] = encode(iteration);
 
     // set the second to last u32 to the thread id
-    const int idx                 = blockDim.x * blockIdx.x + threadIdx.x;
-    block.arr[num_inputs_u32 - 2] = encode(idx);
+    const int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    block.arr[12] = encode(idx);
 
     hash_t best_hash{};
     set_worst_hash_value(best_hash);
     block_t best_block{};
 
     // set the last u32 to the items handled by this thread
-    constexpr int ascii_lowercase_a = 97;
-    for (int i = 0; i < 26; ++i) {
-        const uint32_t mask_i = (ascii_lowercase_a + i) << 24;
-        for (int j = 0; j < 26; ++j) {
-            const uint32_t mask_j = (ascii_lowercase_a + j) << 16;
-            for (int k = 0; k < 26; ++k) {
-                const uint32_t mask_k = (ascii_lowercase_a + k) << 8;
-                for (int l = 0; l < 26; ++l) {
-                    const uint32_t mask_l         = ascii_lowercase_a + l;
-                    block.arr[num_inputs_u32 - 1] = mask_i | mask_j | mask_k | mask_l;
+    for (int i = 0; i < 64; ++i) {
+        const uint32_t mask_i = base64_to_ascii(i) << 24;
+        for (int j = 0; j < 64; ++j) {
+            const uint32_t mask_j = base64_to_ascii(j) << 16;
+            for (int k = 0; k < 64; ++k) {
+                const uint32_t mask_k = base64_to_ascii(k) << 8;
+                block.arr[13]         = mask_i | mask_j | mask_k | uint32_t{0x80};
 
-                    hash_t hash;
-                    sha256(hash, block);
+                hash_t hash;
+                sha256(hash, block);
 
-                    if (less_than(hash, best_hash)) {
-                        copy(best_hash, hash);
-                        copy(best_block, block);
-                    }
+                if (less_than(hash, best_hash)) {
+                    copy(best_hash, hash);
+                    copy(best_block, block);
                 }
             }
         }
@@ -214,11 +210,15 @@ __global__ void __launch_bounds__(block_size) hash(int iteration, block_t* block
 
 void print_input(const block_t& block)
 {
-    for (int i = 0; i < num_inputs_u32; ++i) {
+    for (int i = 0; i < 13; ++i) {
         const uint32_t tmp = swap_endian(block.arr[i]);
         for (int j = 0; j < 4; ++j) {
             printf("%c", reinterpret_cast<const char*>(&tmp)[j]);
         }
+    }
+    const uint32_t tmp = swap_endian(block.arr[13]);
+    for (int j = 0; j < 3; ++j) {
+        printf("%c", reinterpret_cast<const char*>(&tmp)[j]);
     }
     printf("\n");
 }
@@ -275,7 +275,7 @@ int main(int argc, char* argv[])
         CHECK_CUDA(cudaEventElapsedTime(&milliseconds, start, stop));
 
         const double hash_count =
-            static_cast<double>(num_iters_per_batch) * grid_size * block_size * 26 * 26 * 26 * 26;
+            static_cast<double>(num_iters_per_batch) * grid_size * block_size * 64 * 64 * 64;
         const double seconds = milliseconds / 1000.;
         printf(
             "iter [%d, %d): %fGH/s (%fms)\n",
