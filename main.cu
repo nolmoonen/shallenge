@@ -219,25 +219,23 @@ __forceinline__ __device__ __host__ void sha256(
         sha256_round(m[i], k[48 + i], a, b, c, d, e, f, g, h);
     }
 
-    hash.arr[0] = swap_endian(aa + a);
-    hash.arr[1] = swap_endian(bb + b);
-    hash.arr[2] = swap_endian(cc + c);
-    hash.arr[3] = swap_endian(dd + d);
-    hash.arr[4] = swap_endian(ee + e);
-    hash.arr[5] = swap_endian(ff + f);
-    hash.arr[6] = swap_endian(gg + g);
-    hash.arr[7] = swap_endian(hh + h);
+    hash.arr[0] = aa + a;
+    hash.arr[1] = bb + b;
+    hash.arr[2] = cc + c;
+    hash.arr[3] = dd + d;
+    hash.arr[4] = ee + e;
+    hash.arr[5] = ff + f;
+    hash.arr[6] = gg + g;
+    hash.arr[7] = hh + h;
 }
 
 __forceinline__ __device__ __host__ bool less_than(const hash_t& lhs, const hash_t& rhs)
 {
     DEVICE_UNROLL
     for (int i = 0; i < 8; ++i) {
-        const uint32_t lhs_u32 = swap_endian(lhs.arr[i]);
-        const uint32_t rhs_u32 = swap_endian(rhs.arr[i]);
-        if (lhs_u32 < rhs_u32) {
+        if (lhs.arr[i] < rhs.arr[i]) {
             return true;
-        } else if (rhs_u32 < lhs_u32) {
+        } else if (rhs.arr[i] < lhs.arr[i]) {
             return false;
         }
     }
@@ -378,7 +376,7 @@ void print_input(const nonce_t& nonce)
 void print_hash(const hash_t& hash)
 {
     for (int i = 0; i < 8; ++i) {
-        printf("%08x ", swap_endian(hash.arr[i]));
+        printf("%08x ", hash.arr[i]);
     }
     printf("\n");
 }
