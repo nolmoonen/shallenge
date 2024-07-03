@@ -383,6 +383,8 @@ void print_hash(const hash_t& hash)
 
 int main(int argc, char* argv[])
 {
+    setbuf(stdout, nullptr); // make stream unbuffered
+
     int iter_offset = 0;
     if (argc > 1) {
         iter_offset = std::strtol(argv[1], nullptr, 10);
@@ -406,7 +408,7 @@ int main(int argc, char* argv[])
     hash_t best_hash;
     set_worst_hash_value(best_hash);
 
-    const int num_batches = 100;
+    const int num_batches = INT_MAX;
     for (int i = 0; i < num_batches; ++i) {
         // process in batches to reduce synchronization overhead
         CHECK_CUDA(cudaEventRecord(start, stream));
