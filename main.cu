@@ -50,7 +50,7 @@ struct hash_t {
     uint32_t arr[8];
 };
 
-__forceinline__ __device__ __host__ uint32_t rotr(uint32_t a, int b)
+__forceinline__ __device__ __host__ constexpr uint32_t rotr(uint32_t a, int b)
 {
 #if __CUDA_ARCH__ and 0
     // seems to be worse, looks like the compiler can already figure this out
@@ -59,36 +59,53 @@ __forceinline__ __device__ __host__ uint32_t rotr(uint32_t a, int b)
     return (a >> b) | (a << (32 - b));
 #endif
 }
-__forceinline__ __device__ __host__ uint32_t ch(uint32_t x, uint32_t y, uint32_t z)
+__forceinline__ __device__ __host__ constexpr uint32_t ch(uint32_t x, uint32_t y, uint32_t z)
 {
     // return (x & y) ^ (~x & z);
     // https://github.com/hashcat/hashcat/blob/master/OpenCL/inc_hash_sha256.h
     return z ^ (x & (y ^ z));
 }
-__forceinline__ __device__ __host__ uint32_t maj(uint32_t x, uint32_t y, uint32_t z)
+__forceinline__ __device__ __host__ constexpr uint32_t maj(uint32_t x, uint32_t y, uint32_t z)
 {
     // return (x & y) ^ (x & z) ^ (y & z);
     // https://github.com/hashcat/hashcat/blob/master/OpenCL/inc_hash_sha256.h
     return (x & y) | (z & (x ^ y));
 }
-__forceinline__ __device__ __host__ uint32_t ep0(uint32_t x)
+__forceinline__ __device__ __host__ constexpr uint32_t ep0(uint32_t x)
 {
     return rotr(x, 2) ^ rotr(x, 13) ^ rotr(x, 22);
 }
-__forceinline__ __device__ __host__ uint32_t ep1(uint32_t x)
+__forceinline__ __device__ __host__ constexpr uint32_t ep1(uint32_t x)
 {
     return rotr(x, 6) ^ rotr(x, 11) ^ rotr(x, 25);
 }
-__forceinline__ __device__ __host__ uint32_t sig0(uint32_t x)
+__forceinline__ __device__ __host__ constexpr uint32_t sig0(uint32_t x)
 {
     return rotr(x, 7) ^ rotr(x, 18) ^ (x >> 3);
 }
-__forceinline__ __device__ __host__ uint32_t sig1(uint32_t x)
+__forceinline__ __device__ __host__ constexpr uint32_t sig1(uint32_t x)
 {
     return rotr(x, 17) ^ rotr(x, 19) ^ (x >> 10);
 }
 
-__forceinline__ __device__ __host__ void sha256_round(
+constexpr uint32_t m00 = 0x6e6f6c2f; // 'nol/'
+constexpr uint32_t m01 = 0x30303030; // '0000'
+constexpr uint32_t m02 = 0x30303030;
+constexpr uint32_t m03 = 0x30303030;
+constexpr uint32_t m04 = 0x30303030;
+constexpr uint32_t m05 = 0x30303030;
+constexpr uint32_t m06 = 0x30303030;
+constexpr uint32_t m07 = 0x30303030;
+constexpr uint32_t m08 = 0x30303030;
+constexpr uint32_t m09 = 0x30303030;
+constexpr uint32_t m10 = 0x30303030;
+// m11 is iteration
+// m12 is thread index
+// m13 is thread variable and single bit padding
+constexpr uint32_t m14 = 0x00000000; // upper part of u64 size
+constexpr uint32_t m15 = 0x000001b8; // length, 64 - 8 - 1 = 55 * 8 = 440 in u32 big endian
+
+__forceinline__ __device__ __host__ constexpr void sha256_round(
     uint32_t m,
     uint32_t k,
     uint32_t& a,
@@ -113,8 +130,44 @@ __forceinline__ __device__ __host__ void sha256_round(
     a = t1 + t2;
 }
 
-__forceinline__ __device__ __host__ uint32_t
-sha256_update_m_(uint32_t i2, uint32_t i7, uint32_t i15, uint32_t i16)
+#define SHA256_ROUND_11(ABC)                                                                       \
+    __forceinline__ __device__ __host__ constexpr uint32_t sha256_round_11_##ABC()                 \
+    {                                                                                              \
+        uint32_t a = aa;                                                                           \
+        uint32_t b = bb;                                                                           \
+        uint32_t c = cc;                                                                           \
+        uint32_t d = dd;                                                                           \
+        uint32_t e = ee;                                                                           \
+        uint32_t f = ff;                                                                           \
+        uint32_t g = gg;                                                                           \
+        uint32_t h = hh;                                                                           \
+                                                                                                   \
+        sha256_round(m00, k[0], a, b, c, d, e, f, g, h);                                           \
+        sha256_round(m01, k[1], a, b, c, d, e, f, g, h);                                           \
+        sha256_round(m02, k[2], a, b, c, d, e, f, g, h);                                           \
+        sha256_round(m03, k[3], a, b, c, d, e, f, g, h);                                           \
+        sha256_round(m04, k[4], a, b, c, d, e, f, g, h);                                           \
+        sha256_round(m05, k[5], a, b, c, d, e, f, g, h);                                           \
+        sha256_round(m06, k[6], a, b, c, d, e, f, g, h);                                           \
+        sha256_round(m07, k[7], a, b, c, d, e, f, g, h);                                           \
+        sha256_round(m08, k[8], a, b, c, d, e, f, g, h);                                           \
+        sha256_round(m09, k[9], a, b, c, d, e, f, g, h);                                           \
+        sha256_round(m10, k[10], a, b, c, d, e, f, g, h);                                          \
+                                                                                                   \
+        return ABC;                                                                                \
+    }
+
+SHA256_ROUND_11(a)
+SHA256_ROUND_11(b)
+SHA256_ROUND_11(c)
+SHA256_ROUND_11(d)
+SHA256_ROUND_11(e)
+SHA256_ROUND_11(f)
+SHA256_ROUND_11(g)
+SHA256_ROUND_11(h)
+
+__forceinline__ __device__ __host__ constexpr uint32_t sha256_update_m_(
+    uint32_t i2, uint32_t i7, uint32_t i15, uint32_t i16)
 {
     return sig1(i2) + i7 + sig0(i15) + i16;
 }
@@ -136,69 +189,49 @@ __forceinline__ __device__ __host__ uint32_t swap_endian(uint32_t x)
 #endif
 }
 
-constexpr uint32_t m00 = 0x6e6f6c2f; // 'nol/'
-constexpr uint32_t m01 = 0x30303030; // '0000'
-constexpr uint32_t m02 = 0x30303030;
-constexpr uint32_t m03 = 0x30303030;
-constexpr uint32_t m04 = 0x30303030;
-constexpr uint32_t m05 = 0x30303030;
-constexpr uint32_t m06 = 0x30303030;
-constexpr uint32_t m07 = 0x30303030;
-constexpr uint32_t m08 = 0x30303030;
-constexpr uint32_t m09 = 0x30303030;
-constexpr uint32_t m10 = 0x30303030;
-// m11 is iteration
-// m12 is thread index
-// m13 is thread variable and single bit padding
-constexpr uint32_t m14 = 0x00000000; // upper part of u64 size
-constexpr uint32_t m15 = 0x000001b8; // length, 64 - 8 - 1 = 55 * 8 = 440 in u32 big endian
-
 __forceinline__ __device__ __host__ void sha256(
     hash_t& hash, uint32_t m11, uint32_t m12, uint32_t m13)
 {
-    uint32_t a = aa;
-    uint32_t b = bb;
-    uint32_t c = cc;
-    uint32_t d = dd;
-    uint32_t e = ee;
-    uint32_t f = ff;
-    uint32_t g = gg;
-    uint32_t h = hh;
+    constexpr uint32_t aaa = sha256_round_11_a();
+    constexpr uint32_t bbb = sha256_round_11_b();
+    constexpr uint32_t ccc = sha256_round_11_c();
+    constexpr uint32_t ddd = sha256_round_11_d();
+    constexpr uint32_t eee = sha256_round_11_e();
+    constexpr uint32_t fff = sha256_round_11_f();
+    constexpr uint32_t ggg = sha256_round_11_g();
+    constexpr uint32_t hhh = sha256_round_11_h();
 
-    // finish the first 16 rounds using precalculated data
-    sha256_round(m00, k[0], a, b, c, d, e, f, g, h);
-    sha256_round(m01, k[1], a, b, c, d, e, f, g, h);
-    sha256_round(m02, k[2], a, b, c, d, e, f, g, h);
-    sha256_round(m03, k[3], a, b, c, d, e, f, g, h);
-    sha256_round(m04, k[4], a, b, c, d, e, f, g, h);
-    sha256_round(m05, k[5], a, b, c, d, e, f, g, h);
-    sha256_round(m06, k[6], a, b, c, d, e, f, g, h);
-    sha256_round(m07, k[7], a, b, c, d, e, f, g, h);
-    sha256_round(m08, k[8], a, b, c, d, e, f, g, h);
-    sha256_round(m09, k[9], a, b, c, d, e, f, g, h);
-    sha256_round(m10, k[10], a, b, c, d, e, f, g, h);
+    uint32_t a = aaa;
+    uint32_t b = bbb;
+    uint32_t c = ccc;
+    uint32_t d = ddd;
+    uint32_t e = eee;
+    uint32_t f = fff;
+    uint32_t g = ggg;
+    uint32_t h = hhh;
+
     sha256_round(m11, k[11], a, b, c, d, e, f, g, h);
     sha256_round(m12, k[12], a, b, c, d, e, f, g, h);
     sha256_round(m13, k[13], a, b, c, d, e, f, g, h);
     sha256_round(m14, k[14], a, b, c, d, e, f, g, h);
     sha256_round(m15, k[15], a, b, c, d, e, f, g, h);
 
-    uint32_t m16 = sha256_update_m_(m14, m09, m01, m00);
-    uint32_t m17 = sha256_update_m_(m15, m10, m02, m01);
-    uint32_t m18 = sha256_update_m_(m16, m11, m03, m02);
-    uint32_t m19 = sha256_update_m_(m17, m12, m04, m03);
-    uint32_t m20 = sha256_update_m_(m18, m13, m05, m04);
-    uint32_t m21 = sha256_update_m_(m19, m14, m06, m05);
-    uint32_t m22 = sha256_update_m_(m20, m15, m07, m06);
-    uint32_t m23 = sha256_update_m_(m21, m16, m08, m07);
-    uint32_t m24 = sha256_update_m_(m22, m17, m09, m08);
-    uint32_t m25 = sha256_update_m_(m23, m18, m10, m09);
-    uint32_t m26 = sha256_update_m_(m24, m19, m11, m10);
-    uint32_t m27 = sha256_update_m_(m25, m20, m12, m11);
-    uint32_t m28 = sha256_update_m_(m26, m21, m13, m12);
-    uint32_t m29 = sha256_update_m_(m27, m22, m14, m13);
-    uint32_t m30 = sha256_update_m_(m28, m23, m15, m14);
-    uint32_t m31 = sha256_update_m_(m29, m24, m16, m15);
+    constexpr uint32_t m16 = sha256_update_m_(m14, m09, m01, m00);
+    constexpr uint32_t m17 = sha256_update_m_(m15, m10, m02, m01);
+    uint32_t m18           = sha256_update_m_(m16, m11, m03, m02);
+    uint32_t m19           = sha256_update_m_(m17, m12, m04, m03);
+    uint32_t m20           = sha256_update_m_(m18, m13, m05, m04);
+    uint32_t m21           = sha256_update_m_(m19, m14, m06, m05);
+    uint32_t m22           = sha256_update_m_(m20, m15, m07, m06);
+    uint32_t m23           = sha256_update_m_(m21, m16, m08, m07);
+    uint32_t m24           = sha256_update_m_(m22, m17, m09, m08);
+    uint32_t m25           = sha256_update_m_(m23, m18, m10, m09);
+    uint32_t m26           = sha256_update_m_(m24, m19, m11, m10);
+    uint32_t m27           = sha256_update_m_(m25, m20, m12, m11);
+    uint32_t m28           = sha256_update_m_(m26, m21, m13, m12);
+    uint32_t m29           = sha256_update_m_(m27, m22, m14, m13);
+    uint32_t m30           = sha256_update_m_(m28, m23, m15, m14);
+    uint32_t m31           = sha256_update_m_(m29, m24, m16, m15);
 
     uint32_t m[16] = {
         m16, m17, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27, m28, m29, m30, m31};
